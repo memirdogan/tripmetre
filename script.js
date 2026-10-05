@@ -131,12 +131,11 @@
       hasResult: false,
       love: false,        // kalp efekti zaten tetiklendi mi
       soundOn: true,
-      unlocked: false,    // ilk kullanıcı etkileşimi oldu mu (autoplay kısıtı)
-      current: null,      // şu an çalan Audio
+      current: null,      // şu an çalan ses kaynağı (Web Audio)
+      soundToken: 0,      // her yeni ses isteğinde artar; geç kalan eski istekleri iptal eder
       raf: 0,
       timer: 0,
     };
-    const audio = {};     // seviye id → Audio
 
     // ---------- Gösterge çizgileri ve sayıları ----------
     function buildTicks() {
@@ -179,42 +178,81 @@
       state.raf = requestAnimationFrame(step);
     }
 
-    // ---------- Ses ----------
-    // Tarayıcılar ilk etkileşimden önce sesi engeller. İlk dokunuş/tuşta tüm sesleri
-    // sessizce "ısıtıyoruz" (özellikle iOS Safari bunu şart koşuyor).
-    function unlockAudio() {
-      if (state.unlocked) return;
-      state.unlocked = true;
-      CFG.levels.forEach((level) => {
-        if (!level.sound) return;
-        const a = new Audio(level.sound);
-        a.preload = 'auto';
-        audio[level.id] = a;
-        a.muted = true;
-        const p = a.play();
-        if (p && p.then) {
-          p.then(() => {
-            // Bu sırada gerçek çalma istendiyse (state.current) dokunma
-            if (a !== state.current) { a.pause(); a.currentTime = 0; }
-            a.muted = false;
-          }).catch(() => { a.muted = false; }); // dosya yok / engellendi: sessizce devam
-        }
+    // ---------- Ses (Web Audio API) ----------
+    // Neden Web Audio? <audio> ögeleri iOS/Safari'de her seferinde "kullanıcı dokunuşu" ister,
+    // başlama anı da biraz oynak olur. AudioContext tek bir etkileşimle açılır, sonra
+    // sesler istenen anda gecikmesiz başlar.
+    // Ses dosyaları sayfa açılırken indirilir; çözme (decode) ilk etkileşimde yapılır.
+    const rawSounds = {};   // seviye id → Promise<ArrayBuffer|null>
+    const buffers = {};     // seviye id → Promise<AudioBuffer|null>
+    let ctx = null;
+
+    CFG.levels.forEach((level) => {
+      if (!level.sound) return;
+      rawSounds[level.id] = fetch(level.sound)
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .catch(() => null);          // dosya yok (ya da file:// ile açıldı): sessizce devam
+    });
+
+    function ensureContext() {
+      if (ctx) return ctx;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      // iOS: sessiz anahtar (ringer) açıkken Web Audio sustuğu için sesi "oynatma" kategorisine al
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* desteklenmiyor */ }
+      Object.keys(rawSounds).forEach((id) => {
+        buffers[id] = rawSounds[id].then((data) => (data
+          ? new Promise((resolve) => ctx.decodeAudioData(data, resolve, () => resolve(null)))
+          : null)).catch(() => null);
       });
+      return ctx;
     }
 
+    // AudioContext çalışmıyorsa (ilk açılış ya da sekme/uygulama arka plana gidip askıya alındıysa)
+    // her etkileşimde yeniden uyandırmayı dener. Sadece gerçekten "etkileşim sayılan" olaylara
+    // bağlıyız: dokunmatikte pointerdown sayılmaz, pointerup/touchend/click sayılır.
+    function unlockAudio() {
+      if (ctx && ctx.state === 'running') return;
+      const c = ensureContext();
+      if (!c) return;
+      c.resume().catch(() => {});
+      try {   // iOS: etkileşim anında çalan sessiz bir ses, sesin kilidini açar
+        const src = c.createBufferSource();
+        src.buffer = c.createBuffer(1, 1, 22050);
+        src.connect(c.destination);
+        src.start(0);
+      } catch (e) { /* önemli değil */ }
+    }
+    ['pointerup', 'touchend', 'click', 'keydown'].forEach((ev) => document.addEventListener(ev, unlockAudio));
+
     function stopSound() {
-      if (state.current) { state.current.pause(); state.current.currentTime = 0; state.current = null; }
+      state.soundToken++;
+      if (state.current) {
+        try { state.current.stop(); } catch (e) { /* zaten bitmiş */ }
+        state.current = null;
+      }
     }
 
     function playLevelSound(level) {
       stopSound();
-      const a = audio[level.id];
-      if (!state.soundOn || !state.unlocked || !a) return;
-      a.muted = false;
-      try { a.currentTime = 0; } catch (e) { /* metadata henüz yok, sorun değil */ }
-      state.current = a;
-      const p = a.play();
-      if (p && p.catch) p.catch(() => {});
+      const token = state.soundToken;
+      if (!state.soundOn || !ctx || !buffers[level.id]) return;
+      buffers[level.id].then((buf) => {
+        // Çözme sürerken seviye/ses ayarı değiştiyse eski isteği çalma
+        if (!buf || token !== state.soundToken || !state.soundOn) return;
+        const start = () => {
+          if (token !== state.soundToken) return;
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.connect(ctx.destination);
+          src.onended = () => { if (state.current === src) state.current = null; };
+          state.current = src;
+          src.start(0);
+        };
+        if (ctx.state === 'running') start();
+        else ctx.resume().then(start).catch(() => {});   // askıdaysa uyandırıp çal
+      });
     }
 
     // Seviyede birden fazla meme varsa rastgele birini seç; aynı seviyede art arda aynısı gelmesin
@@ -355,9 +393,6 @@
       els.sound.setAttribute('aria-label', state.soundOn ? 'Sesi kapat' : 'Sesi aç');
       if (!state.soundOn) stopSound();
     });
-
-    ['pointerdown', 'keydown', 'touchend'].forEach((ev) =>
-      document.addEventListener(ev, unlockAudio, { passive: true }));
 
     // ---------- Klavye / ekran yüksekliği ----------
     // Mobilde klavye açılınca görünen alan küçülür. visualViewport ile gerçek

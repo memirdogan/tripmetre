@@ -3,7 +3,7 @@
 Sevgilinden gelen mesajı yaz, tribin seviyesini canlı olarak ölç. Yarım daire bir hız göstergesi, seviyeye göre değişen meme, ses ve efektler (sallanma, kırmızı yanıp sönen kenarlar, çatlak cam) içeren tamamen statik bir mini site.
 
 - Sadece HTML + CSS + vanilla JavaScript. Backend, API, veritabanı, yapay zekâ yok.
-- Her şey tarayıcıda çalışır; `index.html` dosyasını çift tıklayıp açsan bile çalışır.
+- Her şey tarayıcıda çalışır. `index.html` dosyasını çift tıklayıp açarsan görsel ve efektler çalışır; ses dosyaları `fetch` ile okunduğu için ses için yerel sunucu (aşağıya bak) ya da Vercel/GitHub Pages gerekir.
 - Mobil öncelikli: dikey telefon ekranında kaydırma gerektirmeden tek ekrana sığar.
 
 ## Nasıl puanlıyor?
