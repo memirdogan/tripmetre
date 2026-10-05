@@ -1,0 +1,289 @@
+/*
+ * Trip Ölçer – stiller
+ * Mobile-first, dikey (9:16) ekran için tasarlandı; her şey tek ekrana sığar.
+ * --vvh: görünen alanın yüksekliği (script.js klavye açılınca günceller)
+ * --lvl: o anki seviyenin rengi (script.js ayarlar)
+ * Seviye efektleri body.level-<id> sınıflarına bağlı (calm, suspicious, danger, explosion).
+ */
+
+:root {
+  --vvh: 100dvh;
+  --vvtop: 0px;
+  --lvl: #c4b5fd;
+  --fg: #fff;
+  --muted: #b9b2d6;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  color: var(--fg);
+  background: radial-gradient(120% 90% at 50% 0%, #2a1f4d 0%, #14102a 55%, #0b0816 100%);
+  font-family: -apple-system, "SF Pro Rounded", "Segoe UI", system-ui, Roboto, sans-serif;
+}
+
+/* ---------- Ana yerleşim ---------- */
+.app {
+  position: fixed;
+  top: var(--vvtop);
+  left: 0; right: 0;
+  margin: 0 auto;
+  width: min(100%, 480px);
+  height: var(--vvh);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: max(env(safe-area-inset-top), 10px) 14px max(env(safe-area-inset-bottom), 12px);
+  text-align: center;
+}
+
+.header { position: relative; width: 100%; flex: none; padding: 0 44px; }
+h1 {
+  margin: 0;
+  font-size: clamp(22px, calc(var(--vvh) * 0.042), 40px);
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+.sub { margin: 2px 0 0; font-size: 15px; color: var(--muted); }
+
+.sound-btn {
+  position: absolute; top: 0; right: -4px;
+  width: 44px; height: 44px;
+  border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 20px; line-height: 1; cursor: pointer; color: #fff;
+}
+
+.stage {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.meter { flex: none; width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+/* ---------- Gösterge ---------- */
+.gauge { width: min(92%, calc(var(--vvh) * 0.5), 430px); height: auto; overflow: visible; }
+.gauge-track { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 22; stroke-linecap: round; }
+.gauge-arc { fill: none; stroke-width: 16; stroke-linecap: round; }
+.tick { stroke: rgba(255, 255, 255, 0.55); stroke-width: 1; }
+.tick.major { stroke: #fff; stroke-width: 2; }
+.tick-label { fill: rgba(255, 255, 255, 0.75); font-size: 9px; font-weight: 700; text-anchor: middle; }
+.needle {
+  fill: #fff;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+  transform: rotate(-90deg);
+  transition: transform 0.7s cubic-bezier(0.22, 1.3, 0.36, 1);
+}
+.hub { fill: #fff; stroke: var(--lvl); stroke-width: 3; transition: stroke 0.3s; }
+
+/* ---------- Puan ve seviye yazıları ---------- */
+.score-line {
+  margin: 0;
+  font-size: clamp(20px, calc(var(--vvh) * 0.03), 30px);
+  font-weight: 700;
+  color: var(--muted);
+}
+.score-line strong {
+  font-size: 1.5em;
+  font-weight: 900;
+  color: var(--lvl);
+  font-variant-numeric: tabular-nums;
+}
+.level-name {
+  margin: 0;
+  font-size: clamp(30px, calc(var(--vvh) * 0.055), 52px);
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--lvl);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--lvl) 55%, transparent);
+}
+.level-text { margin: 2px 0 0; font-size: clamp(17px, calc(var(--vvh) * 0.026), 24px); font-weight: 700; }
+.level-extra { margin: 4px 0 0; font-size: 18px; font-weight: 800; color: #fecaca; }
+
+/* ---------- Meme alanı (görsel yoksa emoji) ---------- */
+.meme {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 56px;
+  width: min(100%, 360px);
+}
+.meme img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  border-radius: 18px;
+}
+.meme-emoji {
+  display: none;
+  position: absolute; inset: 0;
+  align-items: center; justify-content: center;
+  font-size: clamp(56px, calc(var(--vvh) * 0.14), 130px);
+  line-height: 1;
+}
+.meme.fallback img { display: none; }
+.meme.fallback .meme-emoji { display: flex; }
+.meme.pop { animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes pop { 0% { transform: scale(0.6); opacity: 0.2; } 100% { transform: scale(1); opacity: 1; } }
+
+/* ---------- Alt kontroller ---------- */
+.controls { flex: none; width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.actions { display: flex; gap: 10px; justify-content: center; align-items: stretch; min-height: 52px; }
+
+.btn-share {
+  flex: none;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit; font-size: 16px; font-weight: 700;
+  cursor: pointer;
+}
+.btn-share:disabled { opacity: 0.35; cursor: default; }
+
+.btn-apology {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff3d3d, #ff9100);
+  color: #fff;
+  font-size: 18px; font-weight: 900;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 0 0 0 rgba(255, 80, 40, 0.7);
+  animation: attention 0.9s infinite;
+}
+@keyframes attention {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255, 80, 40, 0.7); }
+  50%  { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(255, 80, 40, 0); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255, 80, 40, 0); }
+}
+
+.msg {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-size: 20px;   /* 16px altı olursa iOS odaklanınca sayfayı yakınlaştırır */
+  outline: none;
+  transition: border-color 0.3s;
+}
+.msg::placeholder { color: rgba(255, 255, 255, 0.45); }
+.msg:focus { border-color: var(--lvl); }
+
+/* ---------- Klavye açık / kısa ekran (compact): gösterge solda, meme sağda ---------- */
+body.compact .sub { display: none; }
+body.compact h1 { font-size: 22px; }
+body.compact .app { gap: 6px; padding-top: max(env(safe-area-inset-top), 6px); padding-bottom: 8px; }
+body.compact .header { padding: 0 44px; }
+body.compact .sound-btn { width: 38px; height: 38px; font-size: 17px; }
+body.compact .stage {
+  flex: 1 1 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  align-content: center;
+  gap: 8px;
+}
+body.compact .gauge { width: 100%; }
+body.compact .score-line { font-size: 17px; }
+body.compact .level-name { font-size: 26px; }
+body.compact .level-text { font-size: 15px; margin-top: 0; }
+body.compact .level-extra { font-size: 14px; margin-top: 2px; }
+body.compact .meme { width: 100%; flex: none; aspect-ratio: 1; min-height: 0; max-height: calc(var(--vvh) * 0.45); }
+body.compact .meme-emoji { font-size: 88px; }
+body.compact .actions { min-height: 44px; }
+body.compact .btn-share { padding: 9px 14px; font-size: 15px; }
+body.compact .btn-apology { font-size: 17px; padding: 9px 12px; }
+body.compact .msg { padding: 12px 16px; font-size: 18px; }
+body.compact .controls { gap: 6px; }
+
+body.tiny .level-text { display: none; }
+body.tiny .score-line { font-size: 15px; }
+body.tiny .level-name { font-size: 22px; }
+
+/* ---------- Efekt katmanları ---------- */
+.edge-flash {
+  position: fixed; inset: 0; z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: inset 0 0 70px 18px rgba(255, 30, 30, 0.9);
+}
+.crack {
+  position: fixed; inset: 0; z-index: 60;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  opacity: 0;
+}
+.crack-lines polyline {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.4px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+}
+.hearts { position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden; }
+.heart {
+  position: absolute; bottom: -40px;
+  animation: float-up 3s ease-out both;
+}
+@keyframes float-up {
+  0%   { transform: translateY(0) scale(0.6); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: translateY(-110vh) scale(1.2) rotate(15deg); opacity: 0; }
+}
+
+/* ---------- Seviye efektleri ---------- */
+
+/* 60-89 Tehlike: kırmızı kenarlar yanıp söner + hafif sallanma */
+body.level-danger .edge-flash { animation: flash 1s ease-in-out infinite; }
+body.level-danger .app { animation: shake-soft 0.6s infinite; }
+
+/* 90-100 PATLAMA: hızlı yanıp sönme + çatlak cam + güçlü sallanma (sonra yumuşar) */
+body.level-explosion .edge-flash { animation: flash 0.5s ease-in-out infinite; }
+body.level-explosion .crack { opacity: 1; animation: crack-in 0.25s ease-out; }
+body.level-explosion .app { animation: shake-hard 0.45s 3, shake-soft 0.6s 1.35s infinite; }
+
+@keyframes flash { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes crack-in { 0% { opacity: 0; transform: scale(1.25); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes shake-soft {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-2px, 1px) rotate(-0.3deg); }
+  40% { transform: translate(2px, -1px) rotate(0.3deg); }
+  60% { transform: translate(-1px, -2px) rotate(-0.2deg); }
+  80% { transform: translate(1px, 2px) rotate(0.2deg); }
+}
+@keyframes shake-hard {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  10% { transform: translate(-9px, 4px) rotate(-1.2deg); }
+  30% { transform: translate(8px, -6px) rotate(1.2deg); }
+  50% { transform: translate(-7px, -4px) rotate(-1deg); }
+  70% { transform: translate(9px, 5px) rotate(1deg); }
+  90% { transform: translate(-5px, 3px) rotate(-0.6deg); }
+}
+
+/* Sistemde "hareketi azalt" açıksa sallanma ve yanıp sönmeyi kapat */
+@media (prefers-reduced-motion: reduce) {
+  body.level-danger .app, body.level-explosion .app { animation: none; }
+  body.level-danger .edge-flash, body.level-explosion .edge-flash { animation: none; opacity: 0.5; }
+  .btn-apology { animation: none; }
+  .needle { transition-duration: 0.2s; }
+}
