@@ -11,6 +11,14 @@
 // Kalp emojileri: mesajda geçerse puan düşer (aşağıdaki "kalp" kuralı)
 const HEART_EMOJIS = ['❤', '😘', '🥰', '😍', '💕', '💖', '💗', '💓', '💞', '💋', '♥', '😚', '😻'];
 
+// Sevgi sözcükleri: mesajda geçerse puan düşük kalır (aşağıdaki "sevgi-sozcugu" kuralı).
+// Türkçe karakter yazılmasa da ("askim"), uzatılsa da ("canımmm") yakalanır.
+const AFFECTION_WORDS = [
+  'canım', 'cano', 'canımın içi', 'aşkım', 'aşkom', 'sevgilim', 'hayatım', 'bitanem', 'yavrum',
+  'yavrucuğum', 'güzelim', 'tatlım', 'bebeğim', 'bebişim', 'meleğim', 'prensesim', 'kuzum',
+  'kuzucuğum', 'balım', 'ömrüm', 'gülüm', 'cicim', 'biriciğim',
+];
+
 // Seviye başına meme grupları. Seviyeye her girişte AYNI gruptan rastgele biri seçilir.
 // Tarayıcı klasör listeleyemediği için yeni dosyayı buraya da yazman gerekir.
 // Kaynak ve lisanslar: assets/memes/CREDITS.md
@@ -46,19 +54,22 @@ window.TRIP_CONFIG = {
   // ---------------------------------------------------------------
   // 1) Klasik trip sözlüğü: "ifade": puan (0-100)
   //    Mesajda bu ifadeler KELİME OLARAK geçiyorsa puan alınır.
-  //    Birden fazla ifade eşleşirse en yüksek puan geçerli olur.
+  //    Birden fazla ifade eşleşirse EN UZUN (en özel) olan kazanır; uzunlukları eşitse
+  //    en yüksek puan. Örn: "önemli değil ben kendim hallederim" (78), içindeki
+  //    "önemli değil"in (85) önüne geçer.
+  //    Türkçe karakter yazılmasa da ("gorusuruz") ve uzatılsa da ("peeeki") eşleşir;
+  //    ama uzatma varsa "uzatma" kuralı puanı düşürür (aşağıya bak).
   // ---------------------------------------------------------------
   dictionary: {
+    // --- İlk liste (klasikler) ---
     'tamam': 30,
     'ok': 35,
     'k': 60,
-    'peki': 45,
-    'iyi': 50,
     'hı': 40,
     'hıhı': 40,
+    'iyi': 50,
     'haklısın': 65,
     'nasıl istersen': 70,
-    'sen bilirsin': 80,
     'boşver': 80,
     'önemli değil': 85,
     'uykum var': 75,
@@ -66,16 +77,61 @@ window.TRIP_CONFIG = {
     'bir şey yok': 100,
     'eğlenmene bak': 100,
     'seni seviyorum': 0,
+
+    // --- Genişletilmiş trip listesi (puan = tehlike) ---
+    'peki': 95,
+    'nasıl istiyorsan öyle olsun': 93,
+    'hiçbir şey': 90,
+    'iyiyim sağ ol': 88,
+    'sen bilirsin': 85,
+    'benim için sorun değil': 84,
+    'zaten': 82,
+    'tamam sen haklısın': 80,
+    'önemli değil ben kendim hallederim': 78,
+    'sen ne zaman istiyorsan o zaman yaparız': 77,
+    'yorgunum uyuyacağım': 76,
+    'canın sağ olsun': 75,
+    'görüldü': 74,
+    'sen bilirsin hayat senin hayatın': 72,
+    'sana göre öyle olsun': 70,
+    'teşekkür ederim': 68,
+    'benim hatam zaten her zamanki gibi': 67,
+    'nasıl istersen ben karışmayayım': 65,
+    'tamam kapatalım bu konuyu': 64,
+    'istediğin gibi vakit geçirebilirsin': 62,
+    'gerek yok ben yaparım': 60,
+    'sen nasıl uygun görürsen': 58,
+    'problem değil': 52,
+    'neyse boşver': 50,
+
+    // --- Düz yazılan soğuk kelimeler (tamam anladım, tm, görüşürüz, anlıyorum...) ---
+    'tamam anladım': 88,
+    'anladım': 80,
+    'anlıyorum': 85,
+    'tm': 70,
+    'görüşürüz': 80,
+    'neyse': 65,
+    'iyiyim': 70,
+    'sağ ol': 65,
+    'kolay gelsin': 75,
+    'kendine iyi bak': 92,
   },
+
+  // Yazı yok, sadece emoji atılmışsa taban puan (😊 / 👍 atıp arkasından yazmamak).
+  // 👍'nın tabanı 30: aşağıdaki "basparmak" kuralı +25 ekleyip toplamı 55 yapar.
+  emojiOnly: { '😊': 55, '👍': 30 },
 
   // Bu ifadeler geçerse puan her şeye rağmen 0 olur ve ekranda kalpler uçuşur
   lovePhrases: ['seni seviyorum'],
 
   // ---------------------------------------------------------------
   // 2) Çarpan / ek puan kuralları
-  //    - test(raw): ORİJİNAL metne (baş/son boşluğu silinmiş) bakar
+  //    - test(raw, t): ORİJİNAL metne (baş/son boşluğu silinmiş) bakar.
+  //      t.hasWord('kelime') → kelime/ifade mesajda geçiyor mu? (Türkçe karaktersiz ve
+  //      uzatılmış hali de yakalanır)
   //    - mul: puanı çarpar   - add: puana ekler (negatif olabilir)
-  //    Önce tüm "mul"lar uygulanır, sonra tüm "add"ler eklenir,
+  //    - cap: puanın çıkabileceği en yüksek değer (tavan)
+  //    Önce tüm "mul"lar uygulanır, sonra tüm "add"ler eklenir, sonra "cap"ler,
   //    sonuç 0-100 arasına sıkıştırılır.
   //    Yeni kural eklemek için listeye bir obje daha ekle.
   // ---------------------------------------------------------------
@@ -91,6 +147,12 @@ window.TRIP_CONFIG = {
       add: 30,
     },
     { id: 'kalp',         test: (raw) => HEART_EMOJIS.some((e) => raw.includes(e)),     add: -40 },
+
+    // cap = tavan: o kural tetiklenirse puan bu değerin üstüne ÇIKAMAZ (en son uygulanır)
+    // Sevgi sözcüğü varsa ("Tamam canım", "Peki bitanem") düşük kalsın
+    { id: 'sevgi-sozcugu', test: (raw, t) => AFFECTION_WORDS.some((w) => t.hasWord(w)),   cap: 25 },
+    // Uzatma varsa ("canımmm", "tamammm", "peeeki"): aynı harf 3+ kez art arda
+    { id: 'uzatma',        test: (raw) => /(\p{L})\1{2,}/iu.test(raw),                    cap: 20 },
   ],
 
   // ---------------------------------------------------------------

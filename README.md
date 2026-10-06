@@ -8,10 +8,13 @@ Sevgilinden gelen mesajı yaz, tribin seviyesini canlı olarak ölç. Yarım dai
 
 ## Nasıl puanlıyor?
 
-1. **Sözlük:** "tamam", "peki", "sen bilirsin" gibi klasik tripler sabit puan alır.
+1. **Sözlük:** "peki", "sen bilirsin", "hiçbir şey" gibi klasik tripler (ve "tamam anladım", "tm", "görüşürüz", "anlıyorum" gibi düz yazılan soğuk cevaplar) sabit puan alır. Birden fazla ifade eşleşirse **en uzun (en özel) olan** kazanır: "önemli değil, ben kendim hallederim" (78), içindeki "önemli değil"in (85) önüne geçer. Türkçe karakter yazılmasa da eşleşir ("gorusuruz").
 2. **Sözlükte yoksa:** puan metnin hash'inden üretilir; aynı mesaj her zaman aynı puanı alır.
-3. **Çarpanlar:** nokta, "...", 🙂, 👍, BÜYÜK HARF, kalpli emojiler puanı değiştirir.
-4. Sonuç 0-100 arasına sıkıştırılır ve 4 seviyeden birine düşer: Sakin, Şüpheli, Tehlike, PATLAMA.
+3. **Çarpanlar:** nokta, "...", 🙂, 👍, BÜYÜK HARF, kalpli emojiler puanı değiştirir. Sadece 😊 ya da 👍 atılıp yazılmamışsa da puan alır.
+4. **Sevgi sözcüğü ya da uzatma varsa puan düşük kalır:** "canım", "aşkım", "bitanem", "yavrum", "güzelim" gibi sözcükler geçiyorsa tavan 25, "canımmm", "tamammm", "peeeki" gibi uzatmalarda tavan 20 olur. Yani "Peki." çok yüksek, "Peki canımmm" Sakin çıkar.
+5. Sonuç 0-100 arasına sıkıştırılır ve 4 seviyeden birine düşer: Sakin, Şüpheli, Tehlike, PATLAMA.
+
+Sevgi sözcüklerini `trips.js` içindeki `AFFECTION_WORDS` listesinden, tavan değerlerini `rules` içindeki `sevgi-sozcugu` ve `uzatma` kurallarından değiştirebilirsin.
 
 ## Kendi versiyonunu yap
 

@@ -37,6 +37,21 @@
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
   }
 
+  // Türkçe karakterleri sadeleştir: ç→c, ğ→g, ı→i, ö→o, ş→s, ü→u (â/î/û de)
+  // Sadece sözlük eşleştirmesinde kullanılır: "gorusuruz" yazan da "görüşürüz"ü yakalasın.
+  function fold(s) {
+    return s.replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o')
+      .replace(/ş/g, 's').replace(/ü/g, 'u').replace(/â/g, 'a').replace(/î/g, 'i').replace(/û/g, 'u');
+  }
+
+  // Art arda tekrarlanan harfleri teke indir: "canımmm" → "canım", "peeekii" → "peki"
+  function squash(s) {
+    return s.replace(/(\p{L})\1+/gu, '$1');
+  }
+
+  // Eşleştirme formu: küçük harf + temiz + katlanmış + tekrarsız
+  const matchForm = (s) => squash(fold(cleanForMatch(s)));
+
   // "ifade", temizlenmiş metinde tam kelime(ler) olarak geçiyor mu?
   function hasPhrase(cleaned, phrase) {
     return (' ' + cleaned + ' ').includes(' ' + phrase + ' ');
@@ -46,9 +61,12 @@
   // 2) PUANLAMA
   // ===============================================================
 
-  // Sözlük anahtarlarını bir kez normalize et
-  const DICT = Object.keys(CFG.dictionary).map((k) => [cleanForMatch(k), CFG.dictionary[k]]);
-  const LOVE = new Set(CFG.lovePhrases.map(cleanForMatch));
+  // Sözlük anahtarlarını bir kez normalize et (kelime sayısı: "en uzun eşleşme kazanır" için)
+  const DICT = Object.keys(CFG.dictionary).map((k) => {
+    const phrase = matchForm(k);
+    return { phrase, pts: CFG.dictionary[k], words: phrase.split(' ').length };
+  });
+  const LOVE = new Set(CFG.lovePhrases.map(matchForm));
 
   const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
@@ -69,9 +87,17 @@
 
     const cleaned = cleanForMatch(raw);
 
+    // Kurallara ve sözlüğe verilen yardımcı: metnin katlanmış/tekrarsız hali ve kelime kontrolü
+    const squashed = squash(fold(cleaned));
+    const t = {
+      cleaned,
+      squashed,
+      hasWord: (word) => hasPhrase(squashed, matchForm(word)),
+    };
+
     // --- Özel durum: erken saatte "iyi geceler" → direkt 100 ---
     const gn = CFG.goodNight;
-    if (gn && hasPhrase(cleaned, cleanForMatch(gn.phrase))) {
+    if (gn && t.hasWord(gn.phrase)) {
       const d = now || new Date();
       const hour = d.getHours();
       if (hour >= gn.afterHour && hour < gn.beforeHour) {
@@ -80,36 +106,44 @@
       }
     }
 
-    // --- Taban puan: önce sözlük, yoksa hash ---
-    const matches = DICT.filter(([phrase]) => hasPhrase(cleaned, phrase));
+    // --- Taban puan: önce sözlük, yoksa sadece-emoji tablosu, yoksa hash ---
+    const matches = DICT.filter((d) => hasPhrase(squashed, d.phrase));
     let base;
     let hearts = false;
     if (matches.length) {
-      hearts = matches.some(([phrase]) => LOVE.has(phrase));
-      base = hearts ? 0 : Math.max(...matches.map(([, pts]) => pts));
+      hearts = matches.some((m) => LOVE.has(m.phrase));
+      // En uzun (en özel) eşleşme kazanır: "önemli değil, ben kendim hallederim", "önemli değil"in
+      // önüne geçer. Eşitlikte en yüksek puan.
+      matches.sort((x, y) => y.words - x.words || y.pts - x.pts);
+      base = hearts ? 0 : matches[0].pts;
+    } else if (!cleaned && CFG.emojiOnly && Object.keys(CFG.emojiOnly).some((e) => raw.includes(e))) {
+      // Yazı yok, sadece emoji (😊 / 👍 atıp arkasından yazmamak)
+      base = Math.max(...Object.keys(CFG.emojiOnly).filter((e) => raw.includes(e)).map((e) => CFG.emojiOnly[e]));
     } else {
       // Sözlükte yok: metnin hash'inden 0-100 üret (hep aynı metin = aynı puan).
       // Metin sadece emoji/noktalamaysa temizlenmiş hali boş kalır, ham metni hash'le.
       base = cyrb53(cleaned || trLower(raw)) % 101;
     }
 
-    // --- Çarpanlar (orijinal metne bakar): önce mul, sonra add ---
+    // --- Kurallar (orijinal metne bakar): önce mul, sonra add, en son cap (tavan) ---
     let mul = 1;
     let add = 0;
+    let cap = 100;
     const applied = [];
     for (const rule of CFG.rules) {
-      if (!rule.test(raw)) continue;
+      if (!rule.test(raw, t)) continue;
       applied.push(rule.id);
       if (rule.mul) mul *= rule.mul;
       if (rule.add) add += rule.add;
+      if (rule.cap != null) cap = Math.min(cap, rule.cap);
     }
 
-    const score = Math.round(clamp(base * mul + add, 0, 100));
+    const score = Math.round(clamp(Math.min(base * mul + add, cap), 0, 100));
     return { score, hearts, extra: null, rules: applied };
   }
 
   // Node/test ortamı için dışarı aç (tarayıcıda zararsız)
-  window.TripScore = { computeTrip, cleanForMatch, cyrb53, getLevel };
+  window.TripScore = { computeTrip, cleanForMatch, cyrb53, getLevel, fold, squash };
 
   // ===============================================================
   // 3) ARAYÜZ
