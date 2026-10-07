@@ -16,6 +16,19 @@ Sevgilinden gelen mesajı yaz, tribin seviyesini canlı olarak ölç. Yarım dai
 
 Sevgi sözcüklerini `trips.js` içindeki `AFFECTION_WORDS` listesinden, tavan değerlerini `rules` içindeki `sevgi-sozcugu` ve `uzatma` kurallarından değiştirebilirsin.
 
+## Video modu (ekran kaydı için)
+
+Adrese `?video=1` eklenince site ekran kaydı için sadeleşir, örneğin `https://siteadresin.com/?video=1`:
+
+- Gizlenir: alt başlık, paylaş butonu, "Hemen özür dile" butonu, ses düğmesi, göstergedeki küçük sayılar.
+- Büyür: ibre, puan ("Trip seviyesi" üstte, rakam dev boyutta altta), seviye adı ve seviye yazısı. Meme (kedi) daha çok yer kaplar.
+- Kalır: mesaj kutusu (yazarken görünsün diye), kedi, tüm efektler ve sesler.
+- Puan 55'ten 100'e geçerken yerleşim zıplamaz; her şey sabit yerinde durur.
+
+Gizlenenleri değiştirmek için `style.css` sonundaki `html.video-mode` bölümüne bak. Örneğin özür butonunu videoda göstermek için `.actions` satırını gizleme listesinden çıkar.
+
+Videoda mesajların puanına dikkat: sonuna nokta koymak puanı +20 yapar. `sen bilirsin` 85 (Tehlike) iken `sen bilirsin.` 100 (PATLAMA) olur.
+
 ## Kendi versiyonunu yap
 
 Bütün ayarlar `trips.js` içinde. Mantık dosyasına (`script.js`) dokunmana gerek yok.

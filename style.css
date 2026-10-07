@@ -287,3 +287,38 @@ body.level-explosion .app { animation: shake-hard 0.45s 3, shake-soft 0.6s 1.35s
   .btn-apology { animation: none; }
   .needle { transition-duration: 0.2s; }
 }
+
+/* ---------- Video modu (?video=1): ekran kaydı için sade, dev görünüm ----------
+   Gizlenenler: alt başlık, paylaş ve özür butonları, ses düğmesi, göstergedeki küçük sayılar.
+   Büyüyenler: ibre, puan, seviye adı ve seviye yazısı. Mesaj kutusu ve meme kalır. */
+html.video-mode .sub,
+html.video-mode .actions,        /* paylaş + "Hemen özür dile" satırı; yeri kediye kalsın */
+html.video-mode .sound-btn,
+html.video-mode .tick-label { display: none; }
+
+html.video-mode .app { padding-left: 8px; padding-right: 8px; gap: 10px; }
+html.video-mode .header { padding: 0; }
+html.video-mode .gauge { width: min(100%, calc(var(--vvh) * 0.62), 540px); }
+/* Etiket her zaman üstte, dev rakam altta: 55 → 100 geçişinde satır kırılıp yerleşim zıplamasın */
+html.video-mode .score-line {
+  display: flex; flex-direction: column; align-items: center;
+  font-size: clamp(20px, calc(var(--vvh) * 0.028), 30px);
+  line-height: 1.1;
+}
+html.video-mode .score-line strong {
+  font-size: clamp(56px, calc(var(--vvh) * 0.09), 104px);
+  line-height: 1;
+}
+html.video-mode .level-name { font-size: clamp(42px, calc(var(--vvh) * 0.078), 76px); }
+html.video-mode .level-text { font-size: clamp(22px, calc(var(--vvh) * 0.034), 36px); }
+html.video-mode .meme { width: 100%; }
+
+/* Klavye açıkken (kısa ekran): yan yana düzende de büyük kalsın, seviye yazısı hiç gizlenmesin */
+html.video-mode body.compact .score-line { font-size: 16px; }
+html.video-mode body.compact .score-line strong { font-size: 50px; }
+html.video-mode body.compact .level-name { font-size: 34px; }
+html.video-mode body.compact .level-text { font-size: 17px; }
+html.video-mode body.tiny .score-line { font-size: 14px; }
+html.video-mode body.tiny .score-line strong { font-size: 40px; }
+html.video-mode body.tiny .level-name { font-size: 28px; }
+html.video-mode body.tiny .level-text { display: block; }
